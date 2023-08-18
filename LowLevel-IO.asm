@@ -1,4 +1,4 @@
-TITLE String Primitives and Macros Parameters
+TITLE String Primitives and Macros Parameters     (LowLevel-IO.asm)
 
 ; Author:					Masaki Nishi
 ; Description:				This program gathers 10 valid decimal integers from the user.
@@ -8,16 +8,16 @@ TITLE String Primitives and Macros Parameters
 INCLUDE Irvine32.inc
 
 ; CONSTANTS
-ARRAY_SIZE   = 10			; maximum number for the user input unsigned integers
-MAX_SIZE     = 50			; maximum length for the user input string
+ARRAY_SIZE   = 10		; maximum number for the user input unsigned integers
+MAX_SIZE     = 50		; maximum length for the user input string
 
-LO_ASCII	 = 48			; 0 in ASCII
-HI_ASCII	 = 57			; 9 in ASCII
+LO_ASCII	 = 48		; 0 in ASCII
+HI_ASCII	 = 57		; 9 in ASCII
 
 ; ---------------------------------------------------------------------------------------
 ; Name: mGetString
 ;
-; Prompts the user to enter a signed integer, then store user inputted integer into a memory location.
+; Prompts the user to enter a signed integer, then store user's entered integer into a memory.
 ;
 ; Precondition: none.
 ;
@@ -28,8 +28,7 @@ HI_ASCII	 = 57			; 9 in ASCII
 ; mStringAddress = input address for the string
 ; mStringLength = length of the input string
 ;
-; Returns: 
-; mStringAddress = input address for the string
+; Returns:
 ; mStringLength = length of the input string
 ; ---------------------------------------------------------------------------------------
 mGetString MACRO mPromptMsg, mStringAddress, mStringLength
@@ -80,7 +79,7 @@ ENDM
 					    BYTE    "After you have finished inputting the raw numbers I will display a list of the integers, their sum, and their average value.", 13,10,0
 
     promptMsg           BYTE    ". Please enter an signed number: ", 0
-    errorMsg            BYTE    "  ERROR: You did not enter an signed number or your number was too big.", 13,10,0
+    errorMsg            BYTE    "ERROR: You did not enter an signed number or your number was too big.", 13,10,0
 
     displayNumMsg       BYTE    10, "You entered the following numbers:", 10, 0
 	space				BYTE	", ", 0
@@ -91,9 +90,9 @@ ENDM
 	closingMsg			BYTE	10, "Thanks for playing! ", 0
 
 ; variables
-	numberArray			SDWORD	ARRAY_SIZE DUP (?)	; an array of 10 valid integers from the user
-	stringArray			BYTE	MAX_SIZE DUP (?)	; convereted user's entered strings to output
-	userInputValue		BYTE	MAX_SIZE DUP (?)	; user's entered strings
+	numberArray			SDWORD	ARRAY_SIZE	DUP (?)	; an array of 10 valid integers from the user
+	stringArray			BYTE	MAX_SIZE	DUP (?)	; convereted user's entered strings to output
+	userInputValue		BYTE	MAX_SIZE	DUP (?)	; user's entered strings
 
 	inputCharLength		DWORD	?					; length of the user's entered strings
 	convertedInput		SDWORD	?
@@ -122,8 +121,8 @@ main PROC
 	MOV		ECX, ARRAY_SIZE
 	MOV		EDI, OFFSET numberArray 
 
-	; call ReadVal
 	_getUserValue:
+		; call ReadVal
 		PUSH	ARRAY_SIZE
 		PUSH	inputCharLength
 		PUSH	OFFSET userInputValue
@@ -160,7 +159,7 @@ main PROC
 		PUSH	OFFSET stringArray
 		CALL	WriteVal
 
-		CMP		ECX, 1				; end of loop
+		CMP		ECX, 1				; quit if end of loop
 		JE		_computeSum
 
 		mDisplayString	OFFSET space		
@@ -169,7 +168,7 @@ main PROC
 		LOOP	_outputUserValue
 
 ;------------------------------------------------------------
-; calculate the sum and average of the user's entered signed integers.
+; compute the sum and average of the user's entered signed integers.
 ;------------------------------------------------------------
 	_computeSum:
 		; set up an array
@@ -180,7 +179,7 @@ main PROC
 
 		_computeLoop:
 			; calculate the sum
-			ADD		EAX, [ESI]		; add current value
+			ADD		EAX, [ESI]		; add current element
 			ADD		ESI, 4			; go to next element
 			LOOP	_computeLoop
 			MOV		sum, EAX			
@@ -295,8 +294,10 @@ _signCheck:
 	LODSB						; MOV AL, [ESI]
 
 	MOV		EBX, [EBP+40]		; inputCharLength
-	CMP		EBX, ECX			; if "+ / -"
-	JNE		_convertToInteger
+
+	; if "+ / -"
+	CMP		EBX, ECX
+	JNE		_convertToInt
 
 	; if negative
 	CMP		AL, 45				
@@ -306,14 +307,14 @@ _signCheck:
 	CMP		AL, 43				
 	JE		_goNext
 
-	JMP		_convertToInteger
+	JMP		_convertToInt
 
 	_isNegative:
 		MOV		AL, 1
 		MOV		[EBP+12], AL	; set negative flag
 		JMP		_goNext
 
-	_convertToInteger:
+	_convertToInt:
 		; validate the input character. 48 to 57 is valid integer in ASCII
 		CMP		AL, LO_ASCII
 		JL		_promptUserAgain 
@@ -360,7 +361,6 @@ _quit:
 	POPAD
 	POP		EBP
 	RET		40
-
 ReadVal	ENDP
 
 ; ---------------------------------------------------------------------------------------
