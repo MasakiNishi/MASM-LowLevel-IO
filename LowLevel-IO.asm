@@ -88,6 +88,8 @@ ENDM
 	sumMsg				BYTE	10, "The sum of these numbers is: ", 0
 	averageMsg			BYTE	10, "The truncated average is: ", 0
 
+	closingMsg			BYTE	10, "Thanks for playing! ", 0
+
 ; variables
 	numberArray			SDWORD	ARRAY_SIZE DUP (?)	; an array of 10 valid integers from the user
 	stringArray			BYTE	MAX_SIZE DUP (?)	; convereted user's entered strings to output
@@ -206,6 +208,10 @@ main PROC
 	PUSH	average
 	PUSH	OFFSET stringArray
 	CALL	WriteVal
+
+	; call goodbye
+	PUSH	OFFSET closingMsg
+	CALL	goodbye
 
 	; exit to operating system
 	Invoke	ExitProcess,0
@@ -427,5 +433,30 @@ WriteVal PROC
 	POP		EBP
 	RET		12
 WriteVal ENDP
+
+; ---------------------------------------------------------------------------------
+; Name: goodbye
+;
+; Display a closing message.
+;
+; Preconditions: none.
+;
+; Postconditions: none.
+;
+; Receives:
+; [EBP+8] = closingMsg
+;
+; Returns: nothing.
+; ---------------------------------------------------------------------------------
+goodbye PROC
+	PUSH	EBP
+	MOV		EBP, ESP
+
+	CALL	CrLf
+	mDisplayString [EBP+8]
+
+	POP		EBP
+	RET		4
+goodbye ENDP
 
 END main
