@@ -9,8 +9,10 @@ INCLUDE Irvine32.inc
 
 ; CONSTANTS
 ARRAY_SIZE   = 10			; maximum number for the user input unsigned integers
-MAX_SIZE     = 32			; maximum length for the user input string
-MAX_NUM      = -2147483648
+MAX_SIZE     = 50			; maximum length for the user input string
+
+LO_ASCII	 = 48			; 0 in ASCII
+HI_ASCII	 = 57			; 9 in ASCII
 
 ; ---------------------------------------------------------------------------------------
 ; Name: mGetString
@@ -77,15 +79,19 @@ ENDM
 					    BYTE	"Each number needs to be small enough to fit inside a 32 bit register." , 0Ah
 					    BYTE    "After you have finished inputting the raw numbers I will display a list of the integers, their sum, and their average value.", 13,10,0
 
-    promptMsg           BYTE    "	Please enter an signed number: ", 0
-    errorMsg            BYTE    "	ERROR: You did not enter an signed number or your number was too big.", 13,10,0
+    promptMsg           BYTE    ". Please enter an signed number: ", 0
+    errorMsg            BYTE    "  ERROR: You did not enter an signed number or your number was too big.", 13,10,0
 
     displayNumMsg       BYTE    10, "You entered the following numbers:", 10, 0
+	space				BYTE	", ", 0
+
+	sumMsg				BYTE	10, "The sum of these numbers is: ", 0
+	averageMsg			BYTE	10, "The truncated average is: ", 0
 
 ; variables
 	numberArray			SDWORD	ARRAY_SIZE DUP (?)	; an array of 10 valid integers from the user
-	arrayString			BYTE	MAX_NUM DUP (?)		; convereted user's entered strings to output
-	userInputValue		BYTE	MAX_NUM DUP (?)		; user's entered strings
+	stringArray			BYTE	MAX_SIZE DUP (?)	; convereted user's entered strings to output
+	userInputValue		BYTE	MAX_SIZE DUP (?)	; user's entered strings
 
 	inputCharLength		DWORD	?					; length of the user's entered strings
 	convertedInput		SDWORD	?
@@ -93,6 +99,9 @@ ENDM
 	isNegative			DWORD	0
 	currentTotal		DWORD	0
 	lineCount			DWORD	1	
+
+	sum					SDWORD	0
+	average				SDWORD	0
 
 .code
 
@@ -103,35 +112,100 @@ main PROC
 	PUSH	OFFSET titleMsg
 	CALL	introduction
 
+;------------------------------------------------------------
+; propts the user to enter the numeric values,
+;	and converts the values to the signed integers.
+;------------------------------------------------------------
 	; set up an array
 	MOV		ECX, ARRAY_SIZE
 	MOV		EDI, OFFSET numberArray 
 
 	; call ReadVal
-_validateInput:
-	PUSH	ARRAY_SIZE
-	PUSH	inputCharLength
-	PUSH	OFFSET userInputValue
-	PUSH	OFFSET promptMsg
-	PUSH	OFFSET errorMsg
-	PUSH	OFFSET convertedInput
-	PUSH	currentTotal
-	PUSH	lineCount
-	PUSH	isNegative
-	PUSH	OFFSET arrayString
-	CALL	ReadVal
+	_getUserValue:
+		PUSH	ARRAY_SIZE
+		PUSH	inputCharLength
+		PUSH	OFFSET userInputValue
+		PUSH	OFFSET promptMsg
+		PUSH	OFFSET errorMsg
+		PUSH	OFFSET convertedInput
+		PUSH	currentTotal
+		PUSH	lineCount
+		PUSH	isNegative
+		PUSH	OFFSET stringArray
+		CALL	ReadVal
 
-	MOV		EAX, DWORD PTR convertedInput
-	MOV		[EDI], EAX						; store convertedInput value into the numberArray
-	INC		lineCount
-	ADD		EBX, EAX
+		MOV		EAX, DWORD PTR convertedInput
+		MOV		[EDI], EAX						; store convertedInput value into the numberArray
+		INC		lineCount
+		ADD		EBX, EAX
 
-	ADD		EDI, 4							; point to next element
-	LOOP	_validateInput
+		ADD		EDI, 4							; point to next element
+		LOOP	_getUserValue
 
+;------------------------------------------------------------
+; outputs the list of the user's entered signed integers.
+;------------------------------------------------------------
 	; set up an array
 	MOV		ECX, ARRAY_SIZE	
 	MOV		ESI, OFFSET numberArray
+
+	mDisplayString OFFSET displayNumMsg
+
+	_outputUserValue:
+		; call WriteVal
+		PUSH	ARRAY_SIZE
+		PUSH	[ESI]
+		PUSH	OFFSET stringArray
+		CALL	WriteVal
+
+		CMP		ECX, 1				; end of loop
+		JE		_computeSum
+
+		mDisplayString	OFFSET space		
+
+		ADD		ESI, 4				; point to next element
+		LOOP	_outputUserValue
+
+;------------------------------------------------------------
+; calculate the sum and average of the user's entered signed integers.
+;------------------------------------------------------------
+	_computeSum:
+		; set up an array
+		MOV		ECX, ARRAY_SIZE
+		MOV		ESI, OFFSET numberArray
+
+		MOV		EAX, 0				; initialize the sum
+
+		_computeLoop:
+			; calculate the sum
+			ADD		EAX, [ESI]		; add current value
+			ADD		ESI, 4			; go to next element
+			LOOP	_computeLoop
+			MOV		sum, EAX			
+
+		; calculate the average
+		MOV		EAX, sum
+		CDQ							; clear EDX before IDIV
+		MOV		EBX, ARRAY_SIZE
+		IDIV	EBX						
+		MOV		average, EAX
+
+;------------------------------------------------------------
+; output the sum and the average
+;------------------------------------------------------------	
+	; output the sum
+	mDisplayString OFFSET sumMsg
+	PUSH	ARRAY_SIZE
+	PUSH	sum
+	PUSH	OFFSET stringArray
+	CALL	WriteVal
+
+	; output the average
+	mDisplayString OFFSET averageMsg
+	PUSH	ARRAY_SIZE
+	PUSH	average
+	PUSH	OFFSET stringArray
+	CALL	WriteVal
 
 	; exit to operating system
 	Invoke	ExitProcess,0
@@ -185,7 +259,7 @@ introduction ENDP
 ; [EBP+20] = currentTotal
 ; [EBP+16] = lineCount
 ; [EBP+12] = isNegative
-; [EBP+8]  = arrayString
+; [EBP+8]  = stringArray
 ;
 ; Returns: convertedInput
 ; ---------------------------------------------------------------------------------------
@@ -212,7 +286,7 @@ _promptUser:
 	CLD											
 
 _signCheck:
-	LODSB						; [ESI] to AL
+	LODSB						; MOV AL, [ESI]
 
 	MOV		EBX, [EBP+40]		; inputCharLength
 	CMP		EBX, ECX			; if "+ / -"
@@ -235,14 +309,14 @@ _signCheck:
 
 	_convertToInteger:
 		; validate the input character. 48 to 57 is valid integer in ASCII
-		CMP		AL, 48
+		CMP		AL, LO_ASCII
 		JL		_promptUserAgain 
 
-		CMP		AL, 57
+		CMP		AL, HI_ASCII
 		JG		_promptUserAgain
 
 		; subtract 48, then add it to 10-times the current total to convert to the integer
-		SUB		AL, 48
+		SUB		AL, LO_ASCII
 		MOVSX	EAX, AL				; move with sign of signed integer
 		PUSH	EAX
 
@@ -282,5 +356,76 @@ _quit:
 	RET		40
 
 ReadVal	ENDP
+
+; ---------------------------------------------------------------------------------------
+; Name: WriteVal
+;
+; Converts a signed integer value to ASCII digit string, then outputs the string.
+;
+; Preconditions: none.
+;
+; Postconditions: none.
+;
+; Receives:
+; [EBP+16] = ARRAY_SIZE
+; [EBP+12] = signed integer (will be converted to ASCII)
+; [EBP+8] = stringArray
+;
+; Returns: none.
+; ---------------------------------------------------------------------------------------
+WriteVal PROC
+	; set up stack frame
+	PUSH	EBP
+	MOV		EBP, ESP
+	PUSHAD						
+
+	; setup stringArray and signed integer to be converted
+	MOV		EDI, [EBP+8]
+	MOV		ESI, [EBP+12]
+	MOV		EAX, ESI
+	
+	MOV		ECX, 0			; initialize counter
+
+	; if positive
+	CMP		EAX, 0
+	JGE		_convertToStr
+
+	; if negative
+	NEG		EAX				; multiplying by -1
+	PUSH	EAX
+	MOV		AL, 45			; add the - sign to the value
+	STOSB					; MOV [EDI], AL
+	POP		EAX
+
+	_convertToStr:
+		; divide by 10, then add 48 to the reminder to convert to the string
+		MOV		EBX, 10
+		MOV		EDX, 0
+		CDQ						; clear EDX before IDIV
+		IDIV	EBX				; EAX / 10
+		INC		ECX				; increment counter
+
+		ADD		EDX, LO_ASCII
+		PUSH	EDX				; store converted ASCII (remainder + 48)
+
+		CMP		EAX, 0
+		JZ		_alignStr		; quit if quotient is 0
+		JNZ		_convertToStr	; continue if quotien is not 0
+
+	_alignStr:
+		POP		EAX
+		STOSB
+		LOOP	_alignStr 
+
+		MOV		EAX, 0			; reset the string
+		STOSB
+
+	; output the strings
+	mDisplayString [EBP+8]
+
+	POPAD
+	POP		EBP
+	RET		12
+WriteVal ENDP
 
 END main
